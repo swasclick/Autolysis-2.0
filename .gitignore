@@ -1,0 +1,4 @@
+venv_autolysis/
+__pycache__/
+*.pyc
+.env
