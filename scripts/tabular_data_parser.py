@@ -6,6 +6,7 @@ class TabularParser:
     Class to label each column of the dataframe, which will decide how it is processed
     
     DATA TYPES
+        0. ID
         1. Numerical | Continuous
         2. Numerical | Discrete
         3. Datetime | Yearly
@@ -15,7 +16,10 @@ class TabularParser:
         7. Datetime | Minutely
         8. Categorical | Number
         9. Categorical | String
-        10. Texual
+        10. Email
+        11. Phone Number
+        12. 
+        . Texual
         '''
     
     
