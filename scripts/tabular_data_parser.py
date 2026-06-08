@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import entropy
 from api_caller import APICaller
+from prompts.prompt_loader import PromptLoader
 
 '''parse()
 │
@@ -117,6 +118,7 @@ class TabularParser:
 
     def get_column_groups(self, df: pd.DataFrame, prompt: str):
         
+        prompt = PromptLoader().load_prompt('classify_columns')
         caller = APICaller()
         response = caller.make_api_call(prompt)
     
@@ -156,7 +158,7 @@ class TabularParser:
         condition3 = entropy_val/max_entropy > 0.9 # measure of randomness 
 
         if condition1 and not condition2:
-            
+            pass
         
     def check_boolean(self, series: pd.Series, col_name: str):
         pass
