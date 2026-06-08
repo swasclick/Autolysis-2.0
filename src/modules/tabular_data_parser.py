@@ -39,7 +39,6 @@ from src.prompts.prompt_loader import PromptLoader
 │
 └── unknown'''
 
-
 class TabularParser:
     '''
     Class to parse the columns into:
