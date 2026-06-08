@@ -1,5 +1,5 @@
 from openai import OpenAI
-from error_module import APICallerError
+from src.modules.error_module import APICallerError
 from anthropic import Anthropic
 from google import genai
 import requests

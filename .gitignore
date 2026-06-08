@@ -1,4 +1,6 @@
 venv_autolysis/
 __pycache__/
-*.pyc
+*.py[cod]
 .env
+*.log
+.DS_Store

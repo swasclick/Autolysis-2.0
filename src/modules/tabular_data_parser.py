@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import entropy
-from api_caller import APICaller
-from prompts.prompt_loader import PromptLoader
+from src.modules.api_caller import APICaller
+from src.prompts.prompt_loader import PromptLoader
 
 '''parse()
 │
