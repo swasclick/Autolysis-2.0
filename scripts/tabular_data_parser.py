@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import entropy
+from api_caller import APICaller
 
 '''parse()
 │
@@ -109,10 +110,16 @@ class TabularParser:
     42. Target | Multi-Label Classification
     43. Target | Time Series Forecasting
     '''
-    def __init__(self) -> None:
+    def __init__(self, creds: dict) -> None:
         self.column_classes = {}
         self.column_metadata = {}
+        self.creds = creds
 
+    def get_column_groups(self, df: pd.DataFrame, prompt: str):
+        
+        caller = APICaller()
+        response = caller.make_api_call(prompt)
+    
     def fit(self, df: pd.DataFrame):
         pass
 
@@ -148,7 +155,8 @@ class TabularParser:
         condition2 = series.nunique() / len(series) > 0.9 # uniqueness ratio
         condition3 = entropy_val/max_entropy > 0.9 # measure of randomness 
 
-        if condition1 and not condition2
+        if condition1 and not condition2:
+            
         
     def check_boolean(self, series: pd.Series, col_name: str):
         pass
