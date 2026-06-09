@@ -15,19 +15,9 @@ SUPPORTED PROVIDERS
 
 class APICaller:
     
-    def __init__(self, creds: dict, provider: str,
-                 model: str = "", user_prompt: str= 'This is a default prompt respond by saying please provode a user prompt',
-                 system_prompt: str = 'This is a default prompt respond by saying please provode a system prompt',
-                 temperature: float = 0.7, max_tokens: int = 1000, top_p: float = 1.0
-                 ):
+    def __init__(self, creds: dict, provider: str):
         self.creds = creds
         self.provider = provider.lower().strip()
-        self.model = model
-        self.user_prompt = user_prompt
-        self.system_prompt = system_prompt
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.top_p = top_p
         self.providers = {
             "openai": OpenAIRequestParser,
             "anthropic": AnthropicRequestParser,
@@ -65,8 +55,16 @@ class APICaller:
             'response': response
         }
         
-    def make_api_call(self):
+    def make_api_call(self, model: str = "", user_prompt: str= 'This is a default prompt respond by saying please provode a user prompt',
+                 system_prompt: str = 'This is a default prompt respond by saying please provode a system prompt',
+                 temperature: float = 0.7, max_tokens: int = 1000, top_p: float = 1.0):
         
+        self.model = model
+        self.user_prompt = user_prompt
+        self.system_prompt = system_prompt
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.top_p = top_p
         metadata_dict = self.build_metadata_dict()
         builder = self.build_request(metadata_dict= metadata_dict)
         response_dict = self.send_request(builder= builder)
