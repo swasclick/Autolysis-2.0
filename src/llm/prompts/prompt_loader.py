@@ -11,5 +11,5 @@ class PromptLoader:
         '''
         PROMPT_DIR = pathlib.Path(__file__).parent
         print(f'PROMPT_DIR : {PROMPT_DIR}')
-        prompt = (PROMPT_DIR/f'{prompt_name}.txt').read_text(encoding='utf-8')
+        prompt = (PROMPT_DIR/f'templates/{prompt_name}.txt').read_text(encoding='utf-8')
         return prompt
