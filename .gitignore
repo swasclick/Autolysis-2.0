@@ -5,5 +5,4 @@ __pycache__/
 *.log
 .DS_Store
 *.egg-info/
-**/*.ipynb
-
+*.ipynb
