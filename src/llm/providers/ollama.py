@@ -1,4 +1,7 @@
 import requests
+from modules.logging_module import Logger
+
+logger = Logger().get_logger()
 
 class OllamaRequestParser():
     def __init__(self, creds: dict, metadata_dict: dict):
@@ -24,6 +27,6 @@ class OllamaRequestParser():
             "http://localhost:11434/api/chat",
             json=payload
         )
-
+        logger.info('Got API response')
         return response.json()["message"]["content"]
     

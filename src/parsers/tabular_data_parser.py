@@ -1,8 +1,13 @@
 import pandas as pd
 import numpy as np
+import json
 from scipy.stats import entropy
 from llm.api_caller import APICaller
 from llm.prompts.prompt_loader import PromptLoader
+from modules.logging_module import Logger
+from modules.error_module import ResponseParseError
+
+logger = Logger().get_logger()
 
 '''fit()
 │
@@ -117,6 +122,13 @@ class TabularParser:
         prompt = PromptLoader().load_prompt('classify_columns')
         caller = APICaller()
         response = caller.make_api_call(prompt)
+        try:
+            json.loads(response['response'])
+            logger.debug('Got API response')
+        except Exception as e:
+            logger.error(f"Couldn't parse LLM classification JSON: error {e}")
+            raise ResponseParseError()
+        return response
     
     def fit(self, df: pd.DataFrame):
         pass

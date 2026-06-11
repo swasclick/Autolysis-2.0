@@ -1,5 +1,8 @@
 from openai import OpenAI
 from src.modules.error_module import APICallerError
+from modules.logging_module import Logger
+
+logger = Logger().get_logger()
 
 class OpenAIRequestParser():
     def __init__(self, creds: dict, metadata_dict: dict):
@@ -23,6 +26,7 @@ class OpenAIRequestParser():
             response = client.responses.create(
                 **payload
             )
+            logger.info('Got API response')
             return response
         except Exception as e:
             raise APICallerError(f'Error while making request to provider: {e}')

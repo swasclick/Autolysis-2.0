@@ -1,6 +1,8 @@
 from anthropic import Anthropic
 from src.modules.error_module import APICallerError
+from modules.logging_module import Logger
 
+logger = Logger().get_logger()
 
 class AnthropicRequestParser():
     def __init__(self, creds: dict, metadata_dict: dict):
@@ -25,6 +27,7 @@ class AnthropicRequestParser():
             response = client.messages.create(
                 **payload
             )
+            logger.info('Got API response')
             return response.content[0].text
         except Exception as e:
             raise APICallerError(f'Error while making request to provider: {e}')

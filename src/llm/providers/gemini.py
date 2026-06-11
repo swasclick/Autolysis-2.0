@@ -1,5 +1,8 @@
 from google import genai
 from src.modules.error_module import APICallerError
+from modules.logging_module import Logger
+logger = Logger().get_logger()
+
 
 class GeminiRequestParser():
     def __init__(self, creds: dict, metadata_dict: dict):
@@ -26,6 +29,7 @@ class GeminiRequestParser():
             response = client.models.generate_content(
                 **payload
             )
+            logger.info('Got API response')
             return response.text
         except Exception as e:
             raise APICallerError(f'Error while making request to provider: {e}')
