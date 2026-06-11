@@ -10,6 +10,6 @@ class PromptLoader:
         Function to load a prompt string by its name
         '''
         PROMPT_DIR = pathlib.Path(__file__).parent
-        print(f'PROMPT_DIR : {PROMPT_DIR}')
+        # print(f'PROMPT_DIR : {PROMPT_DIR}')
         prompt = (PROMPT_DIR/f'templates/{prompt_name}.txt').read_text(encoding='utf-8')
         return prompt

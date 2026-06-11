@@ -1,2 +1,2 @@
 import pandas as pd
-from src.prompts.prompt_loader import PromptLoader
+from llm.prompts.prompt_loader import PromptLoader

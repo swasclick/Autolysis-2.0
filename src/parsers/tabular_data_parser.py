@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import entropy
-from src.modules.api_caller import APICaller
-from src.prompts.prompt_loader import PromptLoader
+from llm.api_caller import APICaller
+from llm.prompts.prompt_loader import PromptLoader
 
-'''parse()
+'''fit()
 │
 ├── check_missing()
 ├── check_id()
@@ -89,9 +89,6 @@ class TabularParser:
     # Financial
     30. Currency
     31. Percentage
-
-    # Logical
-    32. Boolean
 
     # Files / Media
     33. File Path
