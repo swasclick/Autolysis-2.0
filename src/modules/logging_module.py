@@ -18,4 +18,4 @@ class Logger:
             self.logger.addHandler(console_handler)
             
     def get_logger(self):
-        return self.logger
+        return self.logger  
