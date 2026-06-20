@@ -140,7 +140,9 @@ class TabularParser:
         pass
 
     def check_missing(self, series: pd.Series, col_name: str):
-        pass
+        metadata = {}
+        
+        metadata['missing_count'] = series.isna().sum()
 
     def check_id(self, series: pd.Series, col_name: str) -> dict:
         '''
