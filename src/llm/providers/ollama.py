@@ -22,11 +22,12 @@ class OllamaRequestParser():
             },
             "stream": False
         }
-
+        # print(payload)
         response = requests.post(
             "http://localhost:11434/api/chat",
             json=payload
         )
         logger.info('Got API response')
+        # print(response)
         return response.json()["message"]["content"]
     

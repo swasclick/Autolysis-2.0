@@ -15,7 +15,7 @@ SUPPORTED PROVIDERS
 
 class APICaller:
     
-    def __init__(self, creds: dict, provider: str):
+    def __init__(self, provider: str, creds: dict = {}):
         self.creds = creds
         self.provider = provider.lower().strip()
         self.providers = {

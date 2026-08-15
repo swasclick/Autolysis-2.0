@@ -111,7 +111,7 @@ class LLMTabularParser:
     42. Target | Multi-Label Classification
     43. Target | Time Series Forecasting
     '''
-    def __init__(self, creds: dict, backend: str ='ollama')  -> None:
+    def __init__(self, creds: dict = {}, backend: str = 'ollama')  -> None:
         self.column_classes = {}
         self.column_metadata = {}
         self.backend = backend
@@ -122,40 +122,287 @@ class LLMTabularParser:
         df_context = df.head(5).to_string().strip()
         prompt = PromptLoader().load_prompt('classify_columns') + df_context
         caller = APICaller(provider = self.backend)
-        classification = caller.make_api_call(prompt)
+        classification = caller.make_api_call(model='llama3', user_prompt=prompt)
         try:
             json.loads(classification['response'])
             logger.debug('Got API response')
         except Exception as e:
             logger.error(f"Couldn't parse LLM classification JSON: error {e}")
             raise ResponseParseError()
-        return classification
+        return json.loads(classification['response'])
     
     def validate_column_classification(self, classification: json, df: pd.DataFrame) -> tuple:
         
-        df_context = df.tail(5).to_string().strip()
-        prompt = PromptLoader().load_prompt('validate_classification') + df_context
+        df_context = df.head(5).to_string().strip()
+        prompt = PromptLoader().load_prompt('validate_classification') +"Dataset:"+ df_context + "Original Classification: " + json.dumps(classification) 
         caller = APICaller(provider = self.backend)
-        validated_classification = caller.make_api_call(prompt)
+        validated_classification = caller.make_api_call(model='llama3', user_prompt=prompt)
+        print(validated_classification)
         try:
             json.loads(validated_classification['response'])
             logger.debug('Got API response')
+            
         except Exception as e:
             logger.error(f"Couldn't parse LLM classification JSON: error {e}")
             raise ResponseParseError()
-
+        validated_classification = json.loads(validated_classification['response'])
         return (True, validated_classification) if validated_classification['errors'] == [] else (False, validated_classification)
 
-    
-    def fit(self, df: pd.DataFrame):
-        pass
+    def get_metadata(self, df: pd.DataFrame, classification: dict):
+        metadata = {}
 
-    
-    
-    def get_metadata(self, series: pd.Series, col_name: str):
-        pass
+        for column, column_type in classification.items():
+            s = df[column]
+
+            # Common metadata for every column
+            column_meta = {
+                "name": column,
+                "dtype": str(s.dtype),
+                "type": column_type,
+                "row_count": len(s),
+                "missing_count": int(s.isna().sum()),
+                "missing_percentage": float(s.isna().mean() * 100),
+                "unique_count": int(s.nunique(dropna=True)),
+                "unique_percentage": float(
+                    s.nunique(dropna=True) / len(s) * 100
+                ) if len(s) > 0 else 0.0,
+            }
+
+            # -------------------------
+            # ID
+            # -------------------------
+            if column_type == "ID":
+                column_meta.update({
+                    "is_unique": bool(s.is_unique),
+                    "is_monotonic": bool(s.is_monotonic_increasing),
+                    "sample_values": s.dropna().head(5).tolist(),
+                })
+
+            # -------------------------
+            # Numerical
+            # -------------------------
+            elif column_type in [
+                "Numerical | Continuous",
+                "Numerical | Discrete"
+            ]:
+                numeric = pd.to_numeric(s, errors="coerce")
+
+                column_meta.update({
+                    "min": float(numeric.min()) if numeric.notna().any() else None,
+                    "max": float(numeric.max()) if numeric.notna().any() else None,
+                    "mean": float(numeric.mean()) if numeric.notna().any() else None,
+                    "median": float(numeric.median()) if numeric.notna().any() else None,
+                    "std": float(numeric.std()) if numeric.notna().any() else None,
+                    "zero_count": int((numeric == 0).sum()),
+                    "negative_count": int((numeric < 0).sum()),
+                    "positive_count": int((numeric > 0).sum()),
+                })
+
+                if column_type == "Numerical | Discrete":
+                    column_meta["value_counts"] = (
+                        numeric.value_counts(dropna=True)
+                        .head(20)
+                        .to_dict()
+                    )
+
+            # -------------------------
+            # Datetime
+            # -------------------------
+            elif column_type.startswith("Datetime"):
+                dt = pd.to_datetime(s, errors="coerce")
+
+                column_meta.update({
+                    "min_date": str(dt.min()) if dt.notna().any() else None,
+                    "max_date": str(dt.max()) if dt.notna().any() else None,
+                    "date_range_days": (
+                        int((dt.max() - dt.min()).days)
+                        if dt.notna().any()
+                        else None
+                    ),
+                })
+
+                if dt.notna().any():
+                    column_meta.update({
+                        "year_count": int(dt.dt.year.nunique()),
+                        "month_count": int(dt.dt.month.nunique()),
+                        "day_count": int(dt.dt.day.nunique()),
+                    })
+
+            # -------------------------
+            # Categorical
+            # -------------------------
+            elif column_type.startswith("Categorical"):
+                value_counts = s.value_counts(dropna=True)
+
+                column_meta.update({
+                    "category_count": int(s.nunique(dropna=True)),
+                    "top_categories": value_counts.head(20).to_dict(),
+                    "most_frequent": (
+                        value_counts.index[0]
+                        if len(value_counts) > 0
+                        else None
+                    ),
+                    "most_frequent_count": (
+                        int(value_counts.iloc[0])
+                        if len(value_counts) > 0
+                        else 0
+                    ),
+                })
+
+                if column_type == "Categorical | Binary":
+                    column_meta["binary_values"] = (
+                        s.dropna().unique().tolist()
+                    )
+
+            # -------------------------
+            # Text
+            # -------------------------
+            elif column_type.startswith("Text"):
+                text = s.dropna().astype(str)
+
+                if len(text) > 0:
+                    lengths = text.str.len()
+
+                    column_meta.update({
+                        "avg_length": float(lengths.mean()),
+                        "min_length": int(lengths.min()),
+                        "max_length": int(lengths.max()),
+                        "median_length": float(lengths.median()),
+                    })
+
+                column_meta["sample_values"] = text.head(5).tolist()
+
+            # -------------------------
+            # Email
+            # -------------------------
+            elif column_type == "Email":
+                text = s.dropna().astype(str)
+
+                column_meta.update({
+                    "sample_values": text.head(5).tolist(),
+                    "unique_domains": int(
+                        text.str.extract(r"@(.+)$", expand=False)
+                        .nunique()
+                    )
+                })
+
+            # -------------------------
+            # Phone
+            # -------------------------
+            elif column_type == "Phone Number":
+                text = s.dropna().astype(str)
+
+                column_meta.update({
+                    "sample_values": text.head(5).tolist(),
+                    "avg_length": (
+                        float(text.str.len().mean())
+                        if len(text) > 0
+                        else None
+                    )
+                })
+
+            # -------------------------
+            # URL
+            # -------------------------
+            elif column_type == "URL":
+                text = s.dropna().astype(str)
+
+                column_meta["sample_values"] = text.head(5).tolist()
+
+            # -------------------------
+            # Geographic
+            # -------------------------
+            elif column_type.startswith("Geographic"):
+                column_meta["sample_values"] = (
+                    s.dropna().head(10).tolist()
+                )
+
+                if column_type in [
+                    "Geographic | Latitude",
+                    "Geographic | Longitude"
+                ]:
+                    numeric = pd.to_numeric(s, errors="coerce")
+
+                    column_meta.update({
+                        "min": float(numeric.min()) if numeric.notna().any() else None,
+                        "max": float(numeric.max()) if numeric.notna().any() else None,
+                        "mean": float(numeric.mean()) if numeric.notna().any() else None,
+                    })
+
+            # -------------------------
+            # Financial
+            # -------------------------
+            elif column_type == "Currency":
+                numeric = pd.to_numeric(s, errors="coerce")
+
+                column_meta.update({
+                    "min": float(numeric.min()) if numeric.notna().any() else None,
+                    "max": float(numeric.max()) if numeric.notna().any() else None,
+                    "mean": float(numeric.mean()) if numeric.notna().any() else None,
+                    "median": float(numeric.median()) if numeric.notna().any() else None,
+                })
+
+            elif column_type == "Percentage":
+                numeric = pd.to_numeric(s, errors="coerce")
+
+                column_meta.update({
+                    "min": float(numeric.min()) if numeric.notna().any() else None,
+                    "max": float(numeric.max()) if numeric.notna().any() else None,
+                    "mean": float(numeric.mean()) if numeric.notna().any() else None,
+                })
+
+            # -------------------------
+            # File / Media
+            # -------------------------
+            elif column_type.startswith(("File Path", "Image Path", "Audio Path", "Video Path")):
+                column_meta["sample_values"] = (
+                    s.dropna().astype(str).head(5).tolist()
+                )
+
+            # -------------------------
+            # Missing / Unknown
+            # -------------------------
+            elif column_type in ["Missing / Empty", "Unknown"]:
+                column_meta["sample_values"] = (
+                    s.dropna().head(5).tolist()
+                )
+
+            # -------------------------
+            # Targets
+            # -------------------------
+            elif column_type.startswith("Target"):
+                column_meta["sample_values"] = (
+                    s.dropna().head(10).tolist()
+                )
+
+                if "Regression" in column_type:
+                    numeric = pd.to_numeric(s, errors="coerce")
+
+                    column_meta.update({
+                        "min": float(numeric.min()) if numeric.notna().any() else None,
+                        "max": float(numeric.max()) if numeric.notna().any() else None,
+                        "mean": float(numeric.mean()) if numeric.notna().any() else None,
+                        "std": float(numeric.std()) if numeric.notna().any() else None,
+                    })
+
+                elif "Classification" in column_type:
+                    column_meta["class_count"] = int(
+                        s.nunique(dropna=True)
+                    )
+                    column_meta["class_distribution"] = (
+                        s.value_counts(dropna=True).to_dict()
+                    )
+
+            metadata[column] = column_meta
+
+        self.column_metadata = metadata
+        return metadata
 
     def check_missing(self, series: pd.Series, col_name: str):
         metadata = {}
         
         metadata['missing_count'] = series.isna().sum()
+        
+    def fit(self, df: pd.DataFrame):
+            pass
+    
