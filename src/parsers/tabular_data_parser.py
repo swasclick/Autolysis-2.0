@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import json
-from scipy.stats import entropy
 from llm.api_caller import APICaller
 from llm.prompts.prompt_loader import PromptLoader
 from modules.logging_module import Logger
@@ -44,7 +43,7 @@ flow:
 │
 └── unknown'''
 
-class TabularParser:
+class LLMTabularParser:
     '''
     Class to parse the columns into:
     
@@ -112,29 +111,46 @@ class TabularParser:
     42. Target | Multi-Label Classification
     43. Target | Time Series Forecasting
     '''
-    def __init__(self, creds: dict) -> None:
+    def __init__(self, creds: dict, backend: str ='ollama')  -> None:
         self.column_classes = {}
         self.column_metadata = {}
+        self.backend = backend
         self.creds = creds
 
-    def get_column_groups(self, df: pd.DataFrame, prompt: str):
+    def get_column_groups(self, df: pd.DataFrame) -> str:
         
-        prompt = PromptLoader().load_prompt('classify_columns')
-        caller = APICaller()
-        response = caller.make_api_call(prompt)
+        df_context = df.head(5).to_string().strip()
+        prompt = PromptLoader().load_prompt('classify_columns') + df_context
+        caller = APICaller(provider = self.backend)
+        classification = caller.make_api_call(prompt)
         try:
-            json.loads(response['response'])
+            json.loads(classification['response'])
             logger.debug('Got API response')
         except Exception as e:
             logger.error(f"Couldn't parse LLM classification JSON: error {e}")
             raise ResponseParseError()
-        return response
+        return classification
+    
+    def validate_column_classification(self, classification: json, df: pd.DataFrame) -> tuple:
+        
+        df_context = df.tail(5).to_string().strip()
+        prompt = PromptLoader().load_prompt('validate_classification') + df_context
+        caller = APICaller(provider = self.backend)
+        validated_classification = caller.make_api_call(prompt)
+        try:
+            json.loads(validated_classification['response'])
+            logger.debug('Got API response')
+        except Exception as e:
+            logger.error(f"Couldn't parse LLM classification JSON: error {e}")
+            raise ResponseParseError()
+
+        return (True, validated_classification) if validated_classification['errors'] == [] else (False, validated_classification)
+
     
     def fit(self, df: pd.DataFrame):
         pass
 
-    def classify_column(self, series: pd.Series, col_name: str):
-        pass
+    
     
     def get_metadata(self, series: pd.Series, col_name: str):
         pass
@@ -143,56 +159,3 @@ class TabularParser:
         metadata = {}
         
         metadata['missing_count'] = series.isna().sum()
-
-    def check_id(self, series: pd.Series, col_name: str) -> dict:
-        '''
-        Checks whether a column is an identifier column
-        '''
-        
-        series = series.dropna()
-        n = len(series)
-        
-        if n == 0 : 
-            return {
-                'is_id': False,
-                'groupable' : False,
-            }
-        
-        # Check if ID in name
-        norm_val_counts = series.value_counts(normalize=True)
-        entropy_val = entropy(norm_val_counts, base=2)
-        max_entropy = np.log2(len(norm_val_counts)) if len(norm_val_counts) > 1 else 1  
-        
-        condition1 = 'id' in col_name.lower() or '_id' in col_name.lower()
-        condition2 = series.nunique() / len(series) > 0.9 # uniqueness ratio
-        condition3 = entropy_val/max_entropy > 0.9 # measure of randomness 
-
-        if condition1 and not condition2:
-            pass
-        
-    def check_boolean(self, series: pd.Series, col_name: str):
-        pass
-
-    def check_datetime(self, series: pd.Series, col_name: str):
-        pass
-
-    def check_email(self, series: pd.Series, col_name: str):
-        pass
-
-    def check_phone(self, series: pd.Series, col_name: str):
-        pass
-
-    def check_url(self, series: pd.Series, col_name: str):
-        pass
-
-    def check_geo(self, series: pd.Series, col_name: str):
-        pass
-
-    def check_numeric(self, series: pd.Series, col_name: str):
-        pass
-
-    def check_categorical(self, series: pd.Series, col_name: str):
-        pass
-
-    def check_text(self, series: pd.Series, col_name: str):
-        pass
