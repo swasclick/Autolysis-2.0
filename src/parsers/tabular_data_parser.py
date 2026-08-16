@@ -4,7 +4,7 @@ import json
 from llm.api_caller import APICaller
 from llm.prompts.prompt_loader import PromptLoader
 from modules.logging_module import Logger
-from modules.error_module import ResponseParseError
+from modules.error_module import ResponseParseError, ClassificationValidationError
 logger = Logger().get_logger()
 
 '''
@@ -111,18 +111,20 @@ class LLMTabularParser:
     42. Target | Multi-Label Classification
     43. Target | Time Series Forecasting
     '''
-    def __init__(self, creds: dict = {}, backend: str = 'ollama')  -> None:
+    def __init__(self, creds: dict = {}, backend: str = 'ollama', model: str = 'llama3')  -> None:
         self.column_classes = {}
         self.column_metadata = {}
         self.backend = backend
         self.creds = creds
+        self.model = model
 
     def get_column_groups(self, df: pd.DataFrame) -> str:
         
-        df_context = df.head(5).to_string().strip()
+        df_context = f"Columns: {df.columns} | Dataframe: {df.head(5).to_string().strip()}"
+        # print(f"Context: {df_context}")
         prompt = PromptLoader().load_prompt('classify_columns') + df_context
         caller = APICaller(provider = self.backend)
-        classification = caller.make_api_call(model='llama3', user_prompt=prompt)
+        classification = caller.make_api_call(model=self.model, user_prompt=prompt)
         try:
             json.loads(classification['response'])
             logger.debug('Got API response')
@@ -131,16 +133,26 @@ class LLMTabularParser:
             raise ResponseParseError()
         return json.loads(classification['response'])
     
-    def validate_column_classification(self, classification: json, df: pd.DataFrame) -> tuple:
+    def validate_column_classification(self, classification: dict, df: pd.DataFrame) -> tuple:
         
-        df_context = df.head(5).to_string().strip()
+        # check if total number of columns is same
+        attempt = 1
+        while (list(classification.keys()) != list(df.columns)) and attempt < 6:
+            logger.info("Total number of columns do not match, retrying...")
+            classification = self.get_column_groups(df)
+            attempt += 1
+        if (list(classification.keys()) != list(df.columns)):
+            logger.error("Cannot get the same number of columns after classification. Check model prompt?")
+            raise ClassificationValidationError()
+        
+        # check classification via an LLM
+        df_context = f"Columns: {df.columns} | Dataframe: {df.head(5).to_string().strip()}"
         prompt = PromptLoader().load_prompt('validate_classification') +"Dataset:"+ df_context + "Original Classification: " + json.dumps(classification) 
         caller = APICaller(provider = self.backend)
-        validated_classification = caller.make_api_call(model='llama3', user_prompt=prompt)
-        print(validated_classification)
+        validated_classification = caller.make_api_call(model=self.model, user_prompt=prompt)
         try:
             json.loads(validated_classification['response'])
-            logger.debug('Got API response')
+            logger.debug('Got classification validation API response')
             
         except Exception as e:
             logger.error(f"Couldn't parse LLM classification JSON: error {e}")

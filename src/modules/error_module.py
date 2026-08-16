@@ -9,3 +9,7 @@ class APICallerError(AutolysisErrors):
 class ResponseParseError(AutolysisErrors):
     def __init__(self, message: str = 'Error in parsing LLM response'):
         super().__init__(message)
+        
+class ClassificationValidationError(AutolysisErrors):
+    def __init__(self, message: str = 'Error in validating LLM column classification'):
+        super().__init__(message)
