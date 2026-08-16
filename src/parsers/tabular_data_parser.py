@@ -7,42 +7,6 @@ from modules.logging_module import Logger
 from modules.error_module import ResponseParseError, ClassificationValidationError
 logger = Logger().get_logger()
 
-'''
-flow:
-│
-├── check_missing()
-├── check_id()
-├── check_boolean()
-├── check_datetime()
-│
-├── check_email()
-├── check_phone()
-├── check_url()
-│
-├── check_geo()
-│
-├── check_numeric()
-│   ├── classify_continuous()
-│   ├── classify_discrete()
-│   ├── classify_currency()
-│   └── classify_percentage()
-│
-├── check_categorical()
-│   ├── binary
-│   ├── ordinal
-│   ├── categorical_number
-│   └── categorical_string
-│
-├── check_text()
-│   ├── short
-│   ├── long
-│   ├── html
-│   ├── json
-│   ├── name
-│   └── address
-│
-└── unknown'''
-
 class LLMTabularParser:
     '''
     Class to parse the columns into:
@@ -211,7 +175,7 @@ class LLMTabularParser:
                 })
 
                 if column_type == "Numerical | Discrete":
-                    column_meta["value_counts"] = (
+                    column_meta["value_counts_top_20"] = (
                         numeric.value_counts(dropna=True)
                         .head(20)
                         .to_dict()
@@ -282,7 +246,7 @@ class LLMTabularParser:
                         "median_length": float(lengths.median()),
                     })
 
-                column_meta["sample_values"] = text.head(5).tolist()
+                column_meta["sample_values"] = text.head(2).tolist()
 
             # -------------------------
             # Email
@@ -292,6 +256,7 @@ class LLMTabularParser:
 
                 column_meta.update({
                     "sample_values": text.head(5).tolist(),
+                    "unique_emails": text.nunique(),
                     "unique_domains": int(
                         text.str.extract(r"@(.+)$", expand=False)
                         .nunique()
@@ -310,7 +275,8 @@ class LLMTabularParser:
                         float(text.str.len().mean())
                         if len(text) > 0
                         else None
-                    )
+                    ),
+                    "unique_numbers": text.nunique()
                 })
 
             # -------------------------
@@ -320,31 +286,45 @@ class LLMTabularParser:
                 text = s.dropna().astype(str)
 
                 column_meta["sample_values"] = text.head(5).tolist()
-
+                column_meta["unique_urls"] = text.nunique()
             # -------------------------
             # Geographic
             # -------------------------
             elif column_type.startswith("Geographic"):
-                column_meta["sample_values"] = (
-                    s.dropna().head(10).tolist()
-                )
+                text = s.dropna()
 
-                if column_type in [
-                    "Geographic | Latitude",
-                    "Geographic | Longitude"
-                ]:
+                column_meta["sample_values"] = text.head(10).tolist()
+
+                if column_type == "Geographic | Latitude":
                     numeric = pd.to_numeric(s, errors="coerce")
 
                     column_meta.update({
                         "min": float(numeric.min()) if numeric.notna().any() else None,
                         "max": float(numeric.max()) if numeric.notna().any() else None,
                         "mean": float(numeric.mean()) if numeric.notna().any() else None,
+                        "valid_range": [-90, 90],
+                        "out_of_range": int(
+                            ((numeric < -90) | (numeric > 90)).sum()
+                        )
+                    })
+
+                elif column_type == "Geographic | Longitude":
+                    numeric = pd.to_numeric(s, errors="coerce")
+
+                    column_meta.update({
+                        "min": float(numeric.min()) if numeric.notna().any() else None,
+                        "max": float(numeric.max()) if numeric.notna().any() else None,
+                        "mean": float(numeric.mean()) if numeric.notna().any() else None,
+                        "valid_range": [-180, 180],
+                        "out_of_range": int(
+                            ((numeric < -180) | (numeric > 180)).sum()
+                        )
                     })
 
             # -------------------------
-            # Financial
+            # Financial / Percentage
             # -------------------------
-            elif column_type == "Currency":
+            elif (column_type == "Currency") or (column_type == "Percentage"):
                 numeric = pd.to_numeric(s, errors="coerce")
 
                 column_meta.update({
@@ -352,15 +332,6 @@ class LLMTabularParser:
                     "max": float(numeric.max()) if numeric.notna().any() else None,
                     "mean": float(numeric.mean()) if numeric.notna().any() else None,
                     "median": float(numeric.median()) if numeric.notna().any() else None,
-                })
-
-            elif column_type == "Percentage":
-                numeric = pd.to_numeric(s, errors="coerce")
-
-                column_meta.update({
-                    "min": float(numeric.min()) if numeric.notna().any() else None,
-                    "max": float(numeric.max()) if numeric.notna().any() else None,
-                    "mean": float(numeric.mean()) if numeric.notna().any() else None,
                 })
 
             # -------------------------
@@ -374,7 +345,7 @@ class LLMTabularParser:
             # -------------------------
             # Missing / Unknown
             # -------------------------
-            elif column_type in ["Missing / Empty", "Unknown"]:
+            elif column_type in ["Unknown","Empty","Missing"]:
                 column_meta["sample_values"] = (
                     s.dropna().head(5).tolist()
                 )
@@ -404,17 +375,11 @@ class LLMTabularParser:
                     column_meta["class_distribution"] = (
                         s.value_counts(dropna=True).to_dict()
                     )
+                    column_meta["missing_values"] = (
+                        s.isna().sum()
+                    )
 
             metadata[column] = column_meta
 
         self.column_metadata = metadata
         return metadata
-
-    def check_missing(self, series: pd.Series, col_name: str):
-        metadata = {}
-        
-        metadata['missing_count'] = series.isna().sum()
-        
-    def fit(self, df: pd.DataFrame):
-            pass
-    

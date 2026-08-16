@@ -12,6 +12,6 @@ grps = parser.get_column_groups(df)
 isvalid, outs = parser.validate_column_classification(classification = grps,df = df)
 print(isvalid)
 # print(outs)
-pprint.pprint(parser.get_metadata(df=df,classification=grps))
+pprint.pprint(parser.get_metadata(df=df,classification=outs["corrected_classification"]))
 
 # print(df.shape)
