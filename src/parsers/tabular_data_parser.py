@@ -85,7 +85,6 @@ class LLMTabularParser:
     def get_column_groups(self, df: pd.DataFrame) -> str:
         
         df_context = f"Columns: {df.columns} | Dataframe: {df.head(5).to_string().strip()}"
-        # print(f"Context: {df_context}")
         prompt = PromptLoader().load_prompt('classify_columns') + df_context
         caller = APICaller(provider = self.backend)
         classification = caller.make_api_call(model=self.model, user_prompt=prompt)
