@@ -36,4 +36,4 @@ class TabularDataAnalyst():
         pass
     
     def analyse(metadata:dict) :
-        
+        pass
